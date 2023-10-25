@@ -1,0 +1,167 @@
+/* ----  Back end  ----------------------------------------------------------------- */
+
+Mise en place du projet:
+- pip install Django
+- django-admin startproject SynthTSteel
+
+Environement virtuel:
+- Installer : "sudo apt install python3-venv"
+- Créez un environnement virtuel: "python3 -m venv venv"
+- Activez l'environnement virtuel: "source venv/bin/activate"
+- python3 manage.py startapp main
+- créer un fichier requirements.txt avec "Django==3.10.12" (python3 --version)
+- pip install -r requirements.txt
+- pip freeze pour visualiser tout ce qui à été installé.
+- (deactivate) pour désactiver l'environnement virtuel
+
+Configuration pour MySQL:
+- pip install mysql-connector-python
+
+Architecture:
+SynthTSteel/
+├── synth/
+├── users/
+├── forum/
+├── tchat/
+├── static/
+├── templates/
+├── client/
+├── main/
+├── utils/
+├── manage.py
+├── requirements.txt
+
+Accés server CORS:
+- pip install django-cors-headers
+- dans settings.py
+INSTALLED_APPS = [
+    # ...
+    'corsheaders',
+    # ...
+]
+et 
+MIDDLEWARE = [
+    # ...
+    'corsheaders.middleware.CorsMiddleware',
+    # ...
+]
+et 
+CORS_ALLOW_ALL_ORIGINS = False
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",  # Exemple pour le développement avec React
+    "http://127.0.0.1:3000",
+]
+- doc officielle :  https://github.com/adamchainz/django-cors-headers
+
+Images:
+- python -m pip install Pillow
+Pillow est une bibliothèque Python utilisée pour le traitement d'images. 
+Dans le contexte de Django, Pillow est souvent utilisé pour gérer les champs d'image, tels que les ImageField dans les modèles.
+
+Créer un super utilisateur:
+- python3 manage.py createsuperuser
+
+Serialiser DRF:
+    Tuto : https://python.doctor/page-django-rest-framework-drf-cours-tuto-tutoriel-exemples
+    Tuto : https://testdriven.io/blog/drf-basics/
+- pip install djangorestframework
+- (pip install --upgrade djangorestframework) si nécéssaire
+- NSTALLED_APPS = [
+    # ...
+    'rest_framework',
+    'rest_framework.authtoken',
+    # ...
+]
+- REST_FRAMEWORK = {
+    'DEFAULT_PERMISSION_CLASSES': (
+        'rest_framework.permissions.IsAuthenticated',
+    ),
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework.authentication.SessionAuthentication',
+        'rest_framework.authentication.TokenAuthentication',
+    ),
+}
+
+
+Pillow :
+- pip install pillow
+
+
+/* ----  BDD  ------------------------------------------------------------------------------ */
+
+Installer MySQL Server :
+- sudo apt-get update
+- sudo apt-get install mysql-server 
+
+Mot de passe :
+- pip install python-decouple : pour stocker le mot de passe de la BDD dans un fichier.env
+- Créer le fichier.env à la racine du projet avec DB_PASSWORD=ST$BddZ01
+
+Configurer MySQL Server :
+- sudo mysql
+- ALTER USER 'root'@'localhost' IDENTIFIED WITH 'mysql_native_password' BY 'ST$BddZ01';
+- EXIT
+
+Démarrer le service MySQL :
+- sudo systemctl start mysql
+- sudo systemctl enable mysql
+
+Sécuriser MySQL :
+- sudo mysql_secure_installation
+- entrer le mot de passe
+- définir les options. 
+    Supprimer les utilisateurs anonymes "yes"
+    Interdire la connexion à distance "yes"
+    Supprimer la base de données de test "yes"
+    Recharger les privilèges "yes"
+
+Créer la BDD:
+- sudo service mysql start: démarre le server MySQL
+- CREATE DATABASE SynthTSteel;
+- SHOW DATABASES;
+- CREATE USER 'TonySteel'@'localhost' IDENTIFIED BY 'ST$BddZ01';
+- GRANT ALL PRIVILEGES ON SynthTSteel.* TO 'TonySteel'@'localhost';
+- FLUSH PRIVILEGES;
+- exit ou Ctrl-D pour sortir
+- pip install mysqlclient
+
+/* ----  Front end  ------------------------------------------------------------------------- */
+
+Mise en place de l'application client:
+- au même niveau que manage.py, lancer "npx create-react-app client"
+- cd client
+- npm install react-router-dom
+- npm install js-cookie
+- npm install axios
+- npm install react-redux
+- npm install @reduxjs/toolkit
+
+/* ----  Lancement  -------------------------------------------------------------------------- */
+
+Lancement du server MySql:
+-sudo service mysql start
+
+Lancement server:
+- python3 manage.py makemigrations
+- python3 manage.py migrate
+- (python3 manage.py createsuperuser) à executer qu'une fois au départ pour créer le super utilisateur
+- source venv/bin/activate
+- python3 manage.py runserver ou python3 manage.py runserver 0.0.0.0:8000
+
+Lancement client:
+- cd client
+- yarn start
+
+/* ----  Sauvegarde  -------------------------------------------------------------------------- */
+
+Github:
+- git init
+- git add .
+- git commit -m "Initial commit"
+- git push
+
+
+/* ----  Doc  -------------------------------------------------------------------------- */
+
+https://docs.djangoproject.com/fr/4.2/topics/auth/default/
+https://www.django-rest-framework.org/tutorial/6-viewsets-and-routers/#using-routers
