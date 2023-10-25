@@ -1,8 +1,11 @@
 
 import json, os
+from os.path import join
 from django.conf import settings
 from django.http import JsonResponse
 from django.contrib.auth import authenticate, logout
+from django.contrib.auth.hashers import make_password
+from urllib.parse import urlparse
 from .serializer import CustomUserSerializer
 from .models import CustomUser
 from rest_framework import viewsets, status, permissions, generics
@@ -27,6 +30,7 @@ class CustomObtainAuthToken(ObtainAuthToken):
             'success': True, 
             'message': 'Authentication successful',
             'user': {
+                'id': user.id,
                 'username': user.username, 
                 'email': user.email,
                 'description': user.description,
@@ -68,8 +72,8 @@ class UserProfileView(generics.RetrieveAPIView):
 
 
 # User UpdateProfile
-class UserUpdateView(generics.UpdateAPIView):
     # Tuto : https://www.youtube.com/watch?v=k208JYSPha8&list=PLJuTqSmOxhNuN1iyCCx3pvkImo7JZpHHc&index=13
+class UserUpdateView(generics.UpdateAPIView):
     queryset = CustomUser.objects.all()
     permission_classes = [IsAuthenticated]
     serializer_class = CustomUserSerializer
@@ -107,13 +111,28 @@ class CustomUserCreateView(generics.CreateAPIView):
     # Tuto : https://www.youtube.com/watch?v=u_Lz1XuwuJk&list=PLJuTqSmOxhNuN1iyCCx3pvkImo7JZpHHc&index=12
     queryset = CustomUser.objects.all()
     serializer_class = CustomUserSerializer
+    
+    def perform_create(self, serializer):
+        # Hacher le mot de passe avant de le stocker
+        password = serializer.validated_data['password']
+        data = self.request.data
+        password2 = data.get('password2')
+        
+        if password and password == password2:
+            hashed_password = make_password(password)
+            serializer.validated_data['password'] = hashed_password
+            serializer.save()
 
 # Delete User
 class CustomUserDeleteView(generics.DestroyAPIView):
     # Tuto : https://www.youtube.com/watch?v=BiocfGlqSfA&list=PLJuTqSmOxhNuN1iyCCx3pvkImo7JZpHHc&index=15
     queryset = CustomUser.objects.all()
-    serializer_class = CustomUserSerializer
-    lookup_field = 'pk'
+    
+    def delete(self, request, *args, **kwargs):
+        user = self.get_object()
+        user.delete()
+        return Response({"success": True, "message": "Votre compte a été supprimé."}, status=status.HTTP_204_NO_CONTENT)
+
 
 # Delete avatar
 class AvatarDeleteView(generics.DestroyAPIView):
@@ -132,6 +151,7 @@ class AvatarDeleteView(generics.DestroyAPIView):
             return Response(status=status.HTTP_404_NOT_FOUND)
 
         # Supprimez l'avatar de l'utilisateur
+        print("user.avatar:", user.avatar)
         if user.avatar:
             user.avatar.delete()  # Supprimez le fichier physique de l'avatar
 
@@ -149,17 +169,22 @@ class PrevAvatarDeleteView(generics.CreateAPIView):
     def create(self, request, *args, **kwargs):
         # Récupérez l'utilisateur actuel à partir de la requête
         data = request.data
-        print("data:", data)
         avatar_url = data.get('avatarUrl')
-        print("avatar_url:", avatar_url)
         
-        if avatar_url :
-            # Supprimez l'avatar précédent
-            avatar_path = avatar_url.replace(settings.MEDIA_URL, settings.MEDIA_ROOT)
+        if avatar_url is not None:
+            # Extrait le nom du fichier de l'URL de l'avatar
+            parsed_url = urlparse(avatar_url)
+            try:
+                filename = parsed_url.path.split('/')[-2] + "/" + parsed_url.path.split('/')[-1]
+            except:
+                return Response(status=status.HTTP_204_NO_CONTENT)
+            
+            # Joindre le nom du fichier avec le répertoire MEDIA_ROOT
+            avatar_path = os.path.join(settings.MEDIA_ROOT, filename)
+
             if os.path.exists(avatar_path):
                 os.remove(avatar_path)
                 return Response(status=status.HTTP_200_OK)
-
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 # CRUD Utilisé pour la liste des utilisateurs

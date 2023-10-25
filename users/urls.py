@@ -23,7 +23,7 @@ urlpatterns = [
     path('logout/', UserLogout.as_view(), name='logout'),
     path('profile/', UserProfileView.as_view(), name='user-profile'),
     path('updateProfile/<int:pk>/', UserUpdateView.as_view(), name='update-profile'),
-    path('deleteUser/', CustomUserDeleteView.as_view(), name='delete-user'),
+    path('deleteUser/<int:pk>/', CustomUserDeleteView.as_view(), name='delete-user'),
     path('deleteAvatar/<int:pk>/', AvatarDeleteView.as_view(), name='delete-avatar'),
     path('deletePreviousAvatar/', PrevAvatarDeleteView.as_view(), name='delete-prev-avatar'),
 ]
