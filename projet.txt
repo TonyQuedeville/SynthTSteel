@@ -163,5 +163,37 @@ Github:
 
 /* ----  Doc  -------------------------------------------------------------------------- */
 
+https://www.django-rest-framework.org/
 https://docs.djangoproject.com/fr/4.2/topics/auth/default/
 https://www.django-rest-framework.org/tutorial/6-viewsets-and-routers/#using-routers
+
+/* ----  JWT  -------------------------------------------------------------------------- */
+
+JWT: Json Web Token --> JOT
+On obtient le token en s'authentifiant avec le username et le mot de passe
+Le token obtenu à un durée de viewsets
+En JWT on obtient 2 tokens. Acces Token et Refresh token.
+L'access token à une durée de vie plus courte que le refresh.
+JWT est un ensemble en 3 parties
+- 1: Headers (information sur le type de token)
+- 2: Payload (information sur le user)
+- 3: Signature (clé secrete) voir https://jwt.io/
+
+Site officiel : https://django-rest-framework-simplejwt.readthedocs.io/en/latest/getting_started.html
+- pip install djangorestframework-simplejwt
+- dans settings/py
+    REST_FRAMEWORK = {
+        ...
+        'DEFAULT_AUTHENTICATION_CLASSES': (
+            ...
+            'rest_framework_simplejwt.authentication.JWTAuthentication',
+        )
+        ...
+    }
+
+    INSTALLED_APPS = [
+        ...
+        'rest_framework_simplejwt',
+        ...
+    ]
+- https://django-rest-framework-simplejwt.readthedocs.io/en/latest/settings.html

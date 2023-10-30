@@ -10,7 +10,8 @@ class CustomUser(AbstractUser):
     description = models.TextField(blank=True)
     avatar = models.ImageField(max_length=255, upload_to="avatars", blank=True)
     isAuthenticated = models.BooleanField(default=False)
-    # password2 = models.CharField(max_length=128, blank=True)
+    reset_password_token = models.CharField(max_length=100, blank=True, null=True)
+
 
 # Attributs par defaut fournis par django:
 # username : Le nom d'utilisateur.

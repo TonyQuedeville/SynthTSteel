@@ -1,23 +1,37 @@
 
 import json, os
-from os.path import join
-from django.conf import settings
-from django.http import JsonResponse
-from django.contrib.auth import authenticate, logout
-from django.contrib.auth.hashers import make_password
-from urllib.parse import urlparse
-from .serializer import CustomUserSerializer
+
 from .models import CustomUser
-from rest_framework import viewsets, status, permissions, generics
+from .serializer import CustomUserSerializer, CustomConfidentialSerializer
+
+from urllib.parse import urlparse
+
+from django.http import JsonResponse
+from django.conf import settings
+from django.urls import reverse
+from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
+from django.utils.encoding import force_bytes
+from django.contrib.auth import authenticate, logout, get_user_model
+from django.contrib.auth.tokens import default_token_generator
+from django.contrib.auth.hashers import make_password
+from django.contrib.auth.models import User
+from django.core.mail import send_mail
+from django.shortcuts import redirect
+
+from rest_framework import status, generics, authentication
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.authtoken.models import Token
 from rest_framework.authtoken.views import ObtainAuthToken, APIView
+from rest_framework.authentication import TokenAuthentication
+from rest_framework_simplejwt.views import TokenObtainPairView
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.decorators import api_view
 from rest_framework.parsers import MultiPartParser, FormParser
 
-# User Login
+# User Login Version Token simple  
 class CustomObtainAuthToken(ObtainAuthToken):    
     def post(self, request):        
         request_data = json.loads(request.body.decode('utf-8'))
@@ -41,19 +55,40 @@ class CustomObtainAuthToken(ObtainAuthToken):
         }, status=status.HTTP_200_OK)
         return response
 
+# User Login Version Token JWT  
+class CustomTokenObtainPairView(TokenObtainPairView):
+    def post(self, request, *args, **kwargs):
+        response = super().post(request, *args, **kwargs)
+        
+        if response.status_code == status.HTTP_200_OK:
+            # Si la demande est réussie, retourner uniquement le jeton d'accès
+            access_token = response.data.get('access')
+            data = {'access': access_token}
+            return Response(data, status=status.HTTP_200_OK)
+        
+        return response  # Si la demande échoue, retournez la réponse d'origine
+
 # Logout
 class UserLogout(APIView):
+    # authentication_classes = [authentication.SessionAuthentication, authentication.TokenAuthentication]
+    authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]  # Vous pouvez utiliser cette classe uniquement si l'utilisateur est authentifié
-
+    
     def post(self, request):
-        print("logout !")
-
-        # Vous pouvez également déconnecter l'utilisateur si vous utilisez des sessions en appelant :
-        logout(request)
-
+        # Supprimez le token d'authentification de l'utilisateur
+        try:
+            token = Token.objects.get(user=request.user)
+            token.delete()
+        except Token.DoesNotExist:
+            print("Pas de token trouvé !")
+            pass
+        
         # Effacez les cookies de session si vous en utilisez.
         if request.session:
             request.session.flush()
+            
+        # Vous pouvez également déconnecter l'utilisateur si vous utilisez des sessions en appelant :
+        logout(request)
 
         return Response({"message": "Vous êtes déconnecté."}, status=status.HTTP_200_OK)
 
@@ -64,7 +99,9 @@ class UserProfileView(generics.RetrieveAPIView):
     queryset = CustomUser.objects.all()
     serializer_class = CustomUserSerializer
     permission_classes = [IsAuthenticated]
-
+    # authentication_classes = [authentication.SessionAuthentication, authentication.TokenAuthentication]
+    authentication_classes = [JWTAuthentication]
+    
     def get_object(self):
         user = self.request.user
         user.isAuthenticated = user.is_authenticated
@@ -72,10 +109,11 @@ class UserProfileView(generics.RetrieveAPIView):
 
 
 # User UpdateProfile
-    # Tuto : https://www.youtube.com/watch?v=k208JYSPha8&list=PLJuTqSmOxhNuN1iyCCx3pvkImo7JZpHHc&index=13
 class UserUpdateView(generics.UpdateAPIView):
+    # Tuto : https://www.youtube.com/watch?v=k208JYSPha8&list=PLJuTqSmOxhNuN1iyCCx3pvkImo7JZpHHc&index=13
     queryset = CustomUser.objects.all()
     permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
     serializer_class = CustomUserSerializer
     lookup_field = 'pk'
     parser_classes = (MultiPartParser, FormParser)
@@ -110,7 +148,7 @@ class UserUpdateView(generics.UpdateAPIView):
 class CustomUserCreateView(generics.CreateAPIView):
     # Tuto : https://www.youtube.com/watch?v=u_Lz1XuwuJk&list=PLJuTqSmOxhNuN1iyCCx3pvkImo7JZpHHc&index=12
     queryset = CustomUser.objects.all()
-    serializer_class = CustomUserSerializer
+    serializer_class = CustomConfidentialSerializer
     
     def perform_create(self, serializer):
         # Hacher le mot de passe avant de le stocker
@@ -127,6 +165,8 @@ class CustomUserCreateView(generics.CreateAPIView):
 class CustomUserDeleteView(generics.DestroyAPIView):
     # Tuto : https://www.youtube.com/watch?v=BiocfGlqSfA&list=PLJuTqSmOxhNuN1iyCCx3pvkImo7JZpHHc&index=15
     queryset = CustomUser.objects.all()
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
     
     def delete(self, request, *args, **kwargs):
         user = self.get_object()
@@ -139,6 +179,7 @@ class AvatarDeleteView(generics.DestroyAPIView):
     # Tuto : https://www.youtube.com/watch?v=BiocfGlqSfA&list=PLJuTqSmOxhNuN1iyCCx3pvkImo7JZpHHc&index=15
     queryset = CustomUser.objects.all()
     serializer_class = CustomUserSerializer
+    authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def destroy(self, request, *args, **kwargs):
@@ -164,6 +205,7 @@ class AvatarDeleteView(generics.DestroyAPIView):
 
 # Delete previous avatar
 class PrevAvatarDeleteView(generics.CreateAPIView):
+    authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def create(self, request, *args, **kwargs):
@@ -187,121 +229,99 @@ class PrevAvatarDeleteView(generics.CreateAPIView):
                 return Response(status=status.HTTP_200_OK)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+
 # CRUD Utilisé pour la liste des utilisateurs
-class UsersModelViewSet(viewsets.ModelViewSet):
+class GetUsersView(generics.ListAPIView):
+    queryset = CustomUser.objects.all()
+    authentication_classes = [JWTAuthentication]
     serializer_class = CustomUserSerializer
-    permission_classes = [permissions.IsAuthenticated]
+
+
+# Mot de passe oublié
+class ForgetPasswordView(APIView):
     queryset = CustomUser.objects.all()
     
-    # CRUD CustomUser
-    # @action(detail=False, methods=['post'])
-    # def custom_list(self, request):
-    #     # Logique pour obtenir la liste des profils d'utilisateurs (GetUsers)
-    #     queryset = CustomUser.objects.all()
-    #     serializer = CustomUserSerializer(queryset, many=True)
-    #     return Response(serializer.data)
+    def post(self, request):
+        print("ForgetPasswordView !")
+        # Récupérez l'adresse e-mail de la requête POST
+        email = request.data.get('email')
+        print("email:", email)
+        if email is None:
+            return Response({'message': 'Veuillez entrer votre adresse mail.'})
 
-    # @action(detail=True, methods=['post'])
-    # def custom_create(self, request):
-    #     # Logique pour créer un nouveau profil d'utilisateur (Register, CreateUser)
-    #     queryset = CustomUser.objects.create()
-    #     serializer = CustomUserSerializer(queryset, many=True)
-    #     return Response(serializer.data)
+        # Vérifiez si l'utilisateur avec cette adresse e-mail existe
+        try:
+            user = CustomUser.objects.get(email=email)
+            print("user:", user)
+        except User.DoesNotExist:
+            # Si l'utilisateur n'existe pas, ne révélez pas d'informations
+            return Response({'message': 'Un e-mail de réinitialisation de mot de passe a été envoyé.'})
+
+        # Générez un token unique pour réinitialiser le mot de passe
+        uid = urlsafe_base64_encode(force_bytes(user.pk))
+        print("uid:", uid)
+        token = default_token_generator.make_token(user)
+        print("token:", token)
         
-    # @action(detail=True, methods=['get']) #, url_path ='login')
-    # def custom_retrieve(self, request, pk=None):
-    #     print("custom_retrieve:", pk)
-    #     # Logique pour obtenir un profil d'utilisateur spécifique (GetUserByXxx)
-    #     if pk == 'update':
-    #         # Récupération de l'utilisateur actuellement connecté
-    #         if request.user.is_authenticated:
-    #             user = request.user
-    #             serializer = CustomUserSerializer(user)
-    #             return Response(serializer.data)
-    #         else:
-    #             return Response({'detail': 'User is not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
-            
-        # elif pk == 'login':
-        #     # Récupération de l'utilisateur par nom d'utilisateur et mot de passe
-        #     username = request.data.get('username')
-        #     password = request.data.get('password')            
-        #     user = CustomUser.objects.get(username=username)
-            
-        #     if user.check_password(password):
-        #         serializer = CustomUserSerializer(user)
-        #         return Response(serializer.data)
-        #     else:
-        #         return Response({'detail': 'Identifiants incorrects'}, status=status.HTTP_400_BAD_REQUEST)
-            
-        # else:
-        #     # Récupération par ID
-        #     try:
-        #         user = CustomUser.objects.get(id=pk)
-        #         serializer = CustomUserSerializer(user)
-        #         return Response(serializer.data)
-        #     except CustomUser.DoesNotExist:
-        #         return Response({'detail': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
+        # Enregistrez le token dans le champ reset_password_token de l'utilisateur
+        user.reset_password_token = token
+        user.save()
+        print("save user !", user)
 
-    # def custom_update(self, request, pk=None):
-    #     # Logique pour mettre à jour un profil d'utilisateur (UpdateUser)
-    #     ...
+        # Créez le lien pour réinitialiser le mot de passe
+        reset_link = reverse('reset-password', args=[uid, token]) or ''
+        print("reset_link:", reset_link)
+        if reset_link == '':
+            reset_url = 'http://localhost:3000/reset-password/' + uid + "/" + token + "/"
+        else:
+            reset_url = request.build_absolute_uri(reset_link)  
+        print("reset_url:", reset_url)
 
-    # def custom_destroy(self, request, pk=None):
-    #     # Logique pour supprimer un profil d'utilisateur (DeleteUser)
-    #     ...
-    
-# @csrf_exempt
-# def loginView(request):  
-#     print("login !")      
-#     if request.method == 'POST':
-#         # Le cookie CSRF est automatiquement géré par Django via le formulaire
-#         try:
-#             # Récupérez le corps de la requête JSON
-#             request_data = json.loads(request.body.decode('utf-8'))
-#             # print("Received data:", request_data)
+        # Envoyez un e-mail à l'utilisateur avec le lien de réinitialisation
+        subject = 'Réinitialisation de mot de passe'
+        message = f'Cliquez sur le lien suivant pour réinitialiser votre mot de passe : {reset_url}'
+        email = "tonyquedeville@gmail.com" # pour les tests
 
-#             # Récupérez les informations d'identification de l'utilisateur
-#             username = request_data['username']
-#             password = request_data['password']
+        try:
+            send_mail(
+                subject,
+                message,
+                # 'webmaster@votre-domaine.com',  # L'adresse d'envoi par défaut
+                [email],  # Destinataire (adresse e-mail de l'utilisateur)
+                fail_silently=False,
+            )
+        except Exception as e:
+            return Response({'message': 'Erreur lors de l\'envoi de l\'e-mail de réinitialisation.'})
 
-#             # Authentification de l'utilisateur
-#             user = authenticate(request, username=username, password=password)            
-            
-#             # Supprimer le jeton existant de l'utilisateur s'il en a un
-#             if hasattr(user, 'auth_token'):
-#                 user.auth_token.delete()
-#             # Créez un jeton d'authentification pour l'utilisateur
-#             token = Token.objects.create(user=user)
-#             print("token key:", token.key)
+        return Response({'message': 'Un e-mail de réinitialisation de mot de passe a été envoyé.'})
 
-#             avatar_url = ''
-#             if user.avatar:
-#                 avatar_url = request.build_absolute_uri(user.avatar.url)
-            
+class ResetPasswordView(APIView):
+    def get(self, request, uid, token):
+        User = get_user_model()
+        try:
+            user_id = urlsafe_base64_decode(uid)
+            user = User.objects.get(pk=user_id)
 
-#             if user is not None:
-#                 login(request, user)
-            
-#             if request.user.is_authenticated:
-#                 user = request.user
-                
-#                 response = JsonResponse({
-#                     'success': True, 
-#                     'message': 'Authentication successful',
-#                     'user': {
-#                         'username': user.username, 
-#                         'email': user.email,
-#                         'description': user.description,
-#                         'avatar': avatar_url,
-#                         'isAuthenticated': True,
-#                         "tokenKey": token.key
-#                         }
-#                     })
-#                 response["Access-Control-Allow-Origin"] = "http://localhost:3000"
-#                 response["Access-Control-Allow-Credentials"] = "true"
-#                 return response
-        
-#         except json.JSONDecodeError:
-#             return JsonResponse({'success': False, 'message': 'Invalid JSON data'})
-#     else:
-#         return JsonResponse({'success': False, 'message': 'Invalid request method'})
+            if default_token_generator.check_token(user, token):
+                # La réinitialisation du mot de passe est autorisée, redirigez vers le formulaire de réinitialisation
+                return redirect(f"/reset-password/{uid}/{token}/reset/")
+            else:
+                # Le token n'est pas valide, renvoyez un message d'erreur
+                return Response({'message': 'Le lien de réinitialisation de mot de passe n\'est pas valide.'}, status=status.HTTP_BAD_REQUEST)
+        except (User.DoesNotExist, ValueError, OverflowError):
+            return Response({'message': 'Le lien de réinitialisation de mot de passe n\'est pas valide.'}, status=status.HTTP_BAD_REQUEST)
+
+
+# ------------------------ Debugage ------------------------------------
+import logging
+
+# Configurer le journal
+logger = logging.getLogger('django.server')
+
+# Dans votre vue, vous pouvez enregistrer les informations de requête
+def post(self, request):
+    # Récupérez les informations de requête
+    logger.info(f"Requête POST reçue sur {request.path}: {request.data}")
+
+    # Votre logique de traitement de la requête ici
+    return Response({'message': 'Réponse de votre vue.'})

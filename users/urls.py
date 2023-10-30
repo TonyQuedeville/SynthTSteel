@@ -1,31 +1,44 @@
 from django.urls import path, include
-from . import views
-from rest_framework import routers, generics
+from rest_framework import routers
 from users.views import *
-from .views import (CustomObtainAuthToken, 
+from .views import (
+                    GetUsersView,
+                    CustomObtainAuthToken, 
+                    CustomTokenObtainPairView,
                     UserLogout,
                     UserProfileView, 
                     UserUpdateView, 
                     CustomUserCreateView, 
                     CustomUserDeleteView, 
                     AvatarDeleteView,
-                    PrevAvatarDeleteView
+                    PrevAvatarDeleteView,
+                    ForgetPasswordView,
+                    ResetPasswordView,
                     )
+from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView, TokenVerifyView
 
 app_name = 'users'
 router = routers.DefaultRouter()
-router.register(r'customUsers', views.UsersModelViewSet) #, basename='customuser')
 
 urlpatterns = [
     path('', include(router.urls)),
+    
+    path('list/', GetUsersView.as_view(), name='list-users'),
     path('newUser/', CustomUserCreateView.as_view(), name='new-user'),
-    path('login/', CustomObtainAuthToken.as_view(), name='login'),
+    
+    # path('login/', CustomObtainAuthToken.as_view(), name='login'), # version Token simple
+    path('login/', CustomTokenObtainPairView.as_view(), name='token_obtain_pair'), # version Token JWT
+    path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('token/verify/', TokenVerifyView.as_view(), name='token_verify'),
+    
     path('logout/', UserLogout.as_view(), name='logout'),
     path('profile/', UserProfileView.as_view(), name='user-profile'),
     path('updateProfile/<int:pk>/', UserUpdateView.as_view(), name='update-profile'),
     path('deleteUser/<int:pk>/', CustomUserDeleteView.as_view(), name='delete-user'),
     path('deleteAvatar/<int:pk>/', AvatarDeleteView.as_view(), name='delete-avatar'),
     path('deletePreviousAvatar/', PrevAvatarDeleteView.as_view(), name='delete-prev-avatar'),
+    path('forgetPassword/', ForgetPasswordView.as_view(), name='forgetPassword-user'),
+    path('reset-password/<str:uid>/<str:token>/', ResetPasswordView.as_view(), name='reset-password')
 ]
 
 # for route in router.registry:
