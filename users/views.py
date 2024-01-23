@@ -31,32 +31,44 @@ from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.decorators import api_view
 from rest_framework.parsers import MultiPartParser, FormParser
 
-# User Login Version Token simple  
-class CustomObtainAuthToken(ObtainAuthToken):    
-    def post(self, request):        
-        request_data = json.loads(request.body.decode('utf-8'))
-        username = request_data['username']
-        password = request_data['password']
-        user = authenticate(request, username=username, password=password)        
-        token, created = Token.objects.get_or_create(user=user)
-        
-        response = JsonResponse({
-            'success': True, 
-            'message': 'Authentication successful',
-            'user': {
-                'id': user.id,
-                'username': user.username, 
-                'email': user.email,
-                'description': user.description,
-                'avatar': "http://127.0.0.1:8000" + user.avatar.url if user.avatar else None,
-                'isAuthenticated': user.is_authenticated,
-                "tokenKey": token.key
-            }
-        }, status=status.HTTP_200_OK)
-        return response
+# User Login Version Token simple
+# class CustomObtainAuthToken(ObtainAuthToken):    
+#     def post(self, request):        
+#         request_data = json.loads(request.body.decode('utf-8'))
+#         username = request_data['username']
+#         password = request_data['password']
+#         user = authenticate(request, username=username, password=password)        
+#         token, created = Token.objects.get_or_create(user=user)
 
-# User Login Version Token JWT  
+#         response = JsonResponse({
+#             'success': True, 
+#             'message': 'Authentication successful',
+#             'user': {
+#                 'id': user.id,
+#                 'username': user.username, 
+#                 'email': user.email,
+#                 'description': user.description,
+#                 'avatar': "http://127.0.0.1:8000" + user.avatar.url if user.avatar else None,
+#                 'isAuthenticated': user.is_authenticated,
+#                 "tokenKey": token.key
+#             }
+#         }, status=status.HTTP_200_OK)
+#         return response
+
+# User Login Version Token JWT
 class CustomTokenObtainPairView(TokenObtainPairView):
+    """
+    Vue de connection utilisateur et d'obtenion du jeton d'accès.
+
+    Args:
+        TokenObtainPairView (classe):
+
+    Methods:
+        post: Méthode pour gérer les requêtes POST et retourner une réponse.
+        
+    Return:
+
+    """
     def post(self, request, *args, **kwargs):
         response = super().post(request, *args, **kwargs)
         
@@ -70,31 +82,40 @@ class CustomTokenObtainPairView(TokenObtainPairView):
 
 # Logout
 class UserLogout(APIView):
-    # authentication_classes = [authentication.SessionAuthentication, authentication.TokenAuthentication]
+    """
+    Vue de déconnection utilisateur
+    
+    Args:
+        APIView (class): 
+    
+    Return:
+        Reponse: Validation de déconnection
+    """
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]  # Vous pouvez utiliser cette classe uniquement si l'utilisateur est authentifié
     
     def post(self, request):
-        # Supprimez le token d'authentification de l'utilisateur
-        try:
-            token = Token.objects.get(user=request.user)
-            token.delete()
-        except Token.DoesNotExist:
-            print("Pas de token trouvé !")
-            pass
+        # Effacez le jeton d'authentification côté client
+        response = Response({"message": "Vous êtes déconnecté. A bientôt !"}, status=status.HTTP_200_OK)
+        response.delete_cookie("authToken")
         
-        # Effacez les cookies de session si vous en utilisez.
-        if request.session:
-            request.session.flush()
-            
-        # Vous pouvez également déconnecter l'utilisateur si vous utilisez des sessions en appelant :
+        # Vous pouvez également déconnecter l'utilisateur s'il utilise des sessions
         logout(request)
 
-        return Response({"message": "Vous êtes déconnecté."}, status=status.HTTP_200_OK)
+        return response
 
 
 # User GetProfile
 class UserProfileView(generics.RetrieveAPIView):
+    """
+    Vue du profil utilisateur
+
+    Args:
+        generics (class): Classe générique de DRF
+        
+    return:
+        Objet profil utilisateur
+    """
     # Tuto : https://www.youtube.com/watch?v=UU2hGwqvvk4&list=PLJuTqSmOxhNuN1iyCCx3pvkImo7JZpHHc&index=11
     queryset = CustomUser.objects.all()
     serializer_class = CustomUserSerializer
@@ -110,6 +131,15 @@ class UserProfileView(generics.RetrieveAPIView):
 
 # User UpdateProfile
 class UserUpdateView(generics.UpdateAPIView):
+    """
+    Vue de modification du profil utilisateur
+
+    Args:
+        generics (class): Classe générique de DRF
+    
+    return:
+        Objet profil utilisateur modifié
+    """
     # Tuto : https://www.youtube.com/watch?v=k208JYSPha8&list=PLJuTqSmOxhNuN1iyCCx3pvkImo7JZpHHc&index=13
     queryset = CustomUser.objects.all()
     permission_classes = [IsAuthenticated]
@@ -146,23 +176,55 @@ class UserUpdateView(generics.UpdateAPIView):
 
 # New User
 class CustomUserCreateView(generics.CreateAPIView):
+    """
+    Vue de création du profil utilisateur en BDD
+
+    Args:
+        generics (class): Classe générique de DRF
+    
+    return:
+        Reponse: Erreur en cas d'echec
+    """
     # Tuto : https://www.youtube.com/watch?v=u_Lz1XuwuJk&list=PLJuTqSmOxhNuN1iyCCx3pvkImo7JZpHHc&index=12
     queryset = CustomUser.objects.all()
     serializer_class = CustomConfidentialSerializer
     
     def perform_create(self, serializer):
-        # Hacher le mot de passe avant de le stocker
+        username = serializer.validated_data['username']
+        email = serializer.validated_data['email']
         password = serializer.validated_data['password']
-        data = self.request.data
-        password2 = data.get('password2')
+        password2 = self.request.data.get('password2')
         
-        if password and password == password2:
+        if not username:
+            print("username:", username)
+            return Response({'error': 'Pseudo manquant !'}, status=status.HTTP_400_BAD_REQUEST)
+        elif not email:
+            print("email:", email)
+            return Response({'error': 'Email manquant !'}, status=status.HTTP_400_BAD_REQUEST)
+        elif password != password2:
+            print("passwords:", password, password2)
+            return Response({'error': 'Les mots de passe ne correspondent pas !'}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            print("Ok !")
+            # Hacher le mot de passe avant de le stocker
             hashed_password = make_password(password)
             serializer.validated_data['password'] = hashed_password
             serializer.save()
 
+            if serializer.is_valid():
+                serializer.save()
+
 # Delete User
 class CustomUserDeleteView(generics.DestroyAPIView):
+    """
+    Vue de suppression du profil utilisateur
+
+    Args:
+        generics (class): Classe générique de DRF
+    
+    return:
+        Reponse: Validation de suppression du profil
+    """
     # Tuto : https://www.youtube.com/watch?v=BiocfGlqSfA&list=PLJuTqSmOxhNuN1iyCCx3pvkImo7JZpHHc&index=15
     queryset = CustomUser.objects.all()
     authentication_classes = [JWTAuthentication]
@@ -176,6 +238,15 @@ class CustomUserDeleteView(generics.DestroyAPIView):
 
 # Delete avatar
 class AvatarDeleteView(generics.DestroyAPIView):
+    """
+    Vue de suppression de l'avatar du profil utilisateur
+
+    Args:
+        generics (class): Classe générique de DRF
+    
+    return:
+        Reponse: Validation de suppression de l'avatar
+    """
     # Tuto : https://www.youtube.com/watch?v=BiocfGlqSfA&list=PLJuTqSmOxhNuN1iyCCx3pvkImo7JZpHHc&index=15
     queryset = CustomUser.objects.all()
     serializer_class = CustomUserSerializer
@@ -205,6 +276,15 @@ class AvatarDeleteView(generics.DestroyAPIView):
 
 # Delete previous avatar
 class PrevAvatarDeleteView(generics.CreateAPIView):
+    """
+    Vue de suppression de l'avatar du profil utilisateur
+
+    Args:
+        generics (class): Classe générique de DRF
+    
+    return:
+        Reponse: Validation de suppression de l'avatar
+    """
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
@@ -232,13 +312,27 @@ class PrevAvatarDeleteView(generics.CreateAPIView):
 
 # CRUD Utilisé pour la liste des utilisateurs
 class GetUsersView(generics.ListAPIView):
+    """
+    Getter: Liste des utilisateurs
+
+    Args:
+        generics (class): Classe générique de DRF
+    """
     queryset = CustomUser.objects.all()
     authentication_classes = [JWTAuthentication]
     serializer_class = CustomUserSerializer
 
-
 # Mot de passe oublié
 class ForgetPasswordView(APIView):
+    """
+    Vue pour mot de passe oublié
+
+    Args:
+        APIView (class): Classe API
+
+    Returns:
+        Reponse: Message de confirmation d'envoi email
+    """
     queryset = CustomUser.objects.all()
     
     def post(self, request):
@@ -296,6 +390,15 @@ class ForgetPasswordView(APIView):
         return Response({'message': 'Un e-mail de réinitialisation de mot de passe a été envoyé.'})
 
 class ResetPasswordView(APIView):
+    """
+    Vue pour validation du mot de passe
+
+    Args:
+        APIView (class): Classe API
+
+    Returns:
+        Reponse: Message de confirmation d'envoi email
+    """
     def get(self, request, uid, token):
         User = get_user_model()
         try:
@@ -313,15 +416,15 @@ class ResetPasswordView(APIView):
 
 
 # ------------------------ Debugage ------------------------------------
-import logging
+# import logging
 
-# Configurer le journal
-logger = logging.getLogger('django.server')
+# # Configurer le journal
+# logger = logging.getLogger('django.server')
 
-# Dans votre vue, vous pouvez enregistrer les informations de requête
-def post(self, request):
-    # Récupérez les informations de requête
-    logger.info(f"Requête POST reçue sur {request.path}: {request.data}")
+# # Dans votre vue, vous pouvez enregistrer les informations de requête
+# def post(self, request):
+#     # Récupérez les informations de requête
+#     logger.info(f"Requête POST reçue sur {request.path}: {request.data}")
 
-    # Votre logique de traitement de la requête ici
-    return Response({'message': 'Réponse de votre vue.'})
+#     # Votre logique de traitement de la requête ici
+#     return Response({'message': 'Réponse de votre vue.'})

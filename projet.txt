@@ -58,6 +58,9 @@ Images:
 Pillow est une bibliothèque Python utilisée pour le traitement d'images. 
 Dans le contexte de Django, Pillow est souvent utilisé pour gérer les champs d'image, tels que les ImageField dans les modèles.
 
+Pillow :
+- pip install pillow
+
 Créer un super utilisateur:
 - python3 manage.py createsuperuser
 
@@ -81,10 +84,6 @@ Serialiser DRF:
         'rest_framework.authentication.TokenAuthentication',
     ),
 }
-
-
-Pillow :
-- pip install pillow
 
 
 /* ----  BDD  ------------------------------------------------------------------------------ */
@@ -111,8 +110,8 @@ Sécuriser MySQL :
 - entrer le mot de passe
 - définir les options. 
     Supprimer les utilisateurs anonymes "yes"
-    Interdire la connexion à distance "yes"
-    Supprimer la base de données de test "yes"
+    Interdir la connexion à distance "yes"
+    Supprimer la base de données de test "no"
     Recharger les privilèges "yes"
 
 Créer la BDD:
@@ -151,6 +150,12 @@ Lancement server:
 Lancement client:
 - cd client
 - yarn start
+
+Lancement des tests unitaires:
+- python manage.py test : Lance tous les tests
+- python manage.py test mon_app.tests.mon_test : lance un test nommé
+(exemple : python3 manage.py test users.tests.CustomUserCreateViewTest.test_custom_user_invalid_email)
+
 
 /* ----  Sauvegarde  -------------------------------------------------------------------------- */
 

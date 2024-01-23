@@ -29,7 +29,6 @@ DEBUG = True
 
 ALLOWED_HOSTS = ['localhost', '127.0.0.1', "192.168.100.151"]
 
-
 SESSION_ENGINE = "django.contrib.sessions.backends.db"
 SESSION_COOKIE_AGE = 1 * 8 * 60 * 60
 
@@ -51,6 +50,7 @@ INSTALLED_APPS = [
 
 # DRF
 DEFAULT_URL_PREFIX = '' # '' pour POST /users/customUsers/ ou 'api' pour POST /users/api/customUsers/ coté client
+
 # Permissions par defaut
 REST_FRAMEWORK = {
     # Authentification
@@ -87,7 +87,7 @@ MIDDLEWARE = [
 ]
 
 
-
+# JWT
 import secrets
 # Générez la clé secrète aléatoire si elle n'est pas déjà définie
 if not 'SECRET_KEY' in locals():
@@ -149,6 +149,8 @@ SIMPLE_JWT = {
 #     'SLIDING_TOKEN_REFRESH_LIFETIME': timedelta(days=14),  
 # }
 
+
+# Configuration
 ROOT_URLCONF = 'SynthTSteel.urls'
 
 TEMPLATES = [
@@ -188,8 +190,11 @@ DATABASES = {
         'NAME': 'SynthTSteel',
         'USER': 'TonySteel',
         'PASSWORD': config('DB_PASSWORD'),
-        'HOST': 'localhost',  # Ou l'adresse IP de votre serveur MySQL
+        'HOST': 'localhost',  # Ou l'adresse IP du serveur MySQL
         'PORT': '3306',  # Le port MySQL, généralement 3306
+        'TEST': {
+            'NAME': 'test_SynthTSteel',  # Spécifier le nom de la base de données de test
+        },
     }
 }
 
@@ -219,7 +224,7 @@ APPEND_SLASH = False
 # Internationalization
 # https://docs.djangoproject.com/en/3.2/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = 'fr'
 
 TIME_ZONE = 'UTC'
 

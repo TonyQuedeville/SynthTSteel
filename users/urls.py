@@ -3,8 +3,8 @@ from rest_framework import routers
 from users.views import *
 from .views import (
                     GetUsersView,
-                    CustomObtainAuthToken, 
-                    CustomTokenObtainPairView,
+                    # CustomObtainAuthToken, # version token simple
+                    CustomTokenObtainPairView, # version token JWT
                     UserLogout,
                     UserProfileView, 
                     UserUpdateView, 

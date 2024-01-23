@@ -5,6 +5,12 @@ from django.contrib.auth.models import AbstractUser
 
 
 class CustomUser(AbstractUser):
+    """
+    Classe Utilisateur
+
+    Args:
+        AbstractUser (class): 
+    """
     email = models.EmailField(unique=True)
     username = models.CharField(max_length=150, unique=True)
     description = models.TextField(blank=True)
